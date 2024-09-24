@@ -1,101 +1,241 @@
 package me.antcode;
 
 import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVRecord;
 
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.Reader;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 public class CSVGatherer {
 
 
-    private final List<Player> totalPlayers;
-
-    public CSVGatherer(){
-        totalPlayers = extractAllPlayers();
-        String inputCsvFile = "C:/Users/antho/IdeaProjects/PBPCleaner/PlayByPlay1Month.csv";
-        String halfProcessedCsv = "halfProcessed.csv";
-        String finalCsvFile = "normalizedPBP.csv";
-        markupCSV(inputCsvFile, halfProcessedCsv);// Adjust the output path if needed
-        establishPossession(halfProcessedCsv, finalCsvFile);
+    public CSVGatherer() {
+        String inputFolder = "C://Users//antho//IdeaProjects//PBPCleaner//NeededPBPS";
+        String finalCSV = "processedCSVs";
+        String matchupInput = "C://Users//antho//IdeaProjects//PBPCleaner//MATCHUPS (2).csv";
+        String matchupOutput = "matchupsProcessed";
+//        markupCSVs(getAllCSVFiles(inputFolder), finalCSV); // Adjust the output path if needed
+        convertMatchupDates(matchupInput, matchupOutput);
     }
 
 
-    private List<Player> extractAllPlayers() {
-        List<Player> players = new ArrayList<>();
-        try (Reader reader = new FileReader("C:/Users/antho/IdeaProjects/PBPCleaner/Matchup1Month.csv");
-             //Opens the parser and starts at second row since first row is the headers/column names
-             CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build())) {
+    private List<File> getAllCSVFiles(String folderPath) {
+        File folder = new File(folderPath);
+        File[] files = folder.listFiles((dir, name) -> name.toLowerCase().endsWith(".csv"));
+        return files != null ? Arrays.asList(files) : new ArrayList<>();
+    }
 
-            //Creates all the matchups
-            for (CSVRecord csvRecord : csvParser) {
-                List<Player> homeStarters = extractPlayersFromMatchupData(csvRecord, "home_starter_", 5);
-                List<Player> awayStarters = extractPlayersFromMatchupData(csvRecord, "away_starter_", 5);
-                List<Player> homeBench = extractPlayersFromMatchupData(csvRecord, "home_bench_", 10);
-                List<Player> awayBench = extractPlayersFromMatchupData(csvRecord, "away_bench_", 10);
-                players.addAll(homeStarters);
-                players.addAll(awayStarters);
-                players.addAll(homeBench);
-                players.addAll(awayBench);
+
+
+//    private void markupCSV(List<File> inputCsvFiles, String outputFolderPath) {
+//        // Create the output folder if it doesn't exist
+//        File outputFolder = new File(outputFolderPath);
+//        if (!outputFolder.exists()) {
+//            outputFolder.mkdirs();
+//        }
+//
+//        for (File inputFile : inputCsvFiles) {
+//            // Determine output file path
+//            File outputFile = new File(outputFolder, inputFile.getName());
+//
+//            try (Reader reader = new FileReader(inputFile);
+//                 FileWriter writer = new FileWriter(outputFile);
+//                 CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT.builder().setHeader(getCombinedHeader(inputFile).toArray(new String[0])).build())) {
+//
+//                CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build();
+//                Iterable<CSVRecord> records = csvFormat.parse(reader);
+//
+//                // Get the index of the "date" column
+//                List<String> headersList = new ArrayList<>(records.iterator().next().toMap().keySet());
+//                int dateIndex = headersList.indexOf("date");
+//
+//                for (CSVRecord record : records) {
+//                    List<String> newRecord = new ArrayList<>(record.toList());
+//                    newRecord.replaceAll(s -> s.replace("Jones, Jr.", "Jones Jr."));
+//                    newRecord.replaceAll(s -> s.replace("Jones,\"\\s*Jr", "Jones Jr."));
+//                    // Convert the date format and set it at the appropriate index
+//                    String dateValue = record.get(dateIndex);
+//                    newRecord.set(dateIndex, convertDateFormat(dateValue));
+//
+//                    // Existing code to add new columns
+//                    String textColumnValue = record.get("description").toLowerCase();
+//                    String typeColumnValue = record.get("type").toLowerCase();
+//                    String eventColumnValue = record.get("event_type").toLowerCase();
+//
+//                    newRecord.add(eventColumnValue.contains("rebound") ? "true" : "false");
+//                    newRecord.add(textColumnValue.contains("ast)") ? "true" : "false");
+//                    newRecord.add(eventColumnValue.contains("foul") ? "true" : "false");
+//                    newRecord.add(!record.get("result").isEmpty() || !record.get("shot_distance").isEmpty() || typeColumnValue.contains("offensive") ? "true" : "false");
+//                    newRecord.add(typeColumnValue.contains("defensive") ? "true" : "false");
+//                    newRecord.add(eventColumnValue.contains("turnover") ? "true" : "false");
+//                    newRecord.add(eventColumnValue.contains("violation") ? "true" : "false");
+//                    newRecord.add(textColumnValue.contains("coach") || eventColumnValue.contains("start of period") || typeColumnValue.contains("challenge") || eventColumnValue.isEmpty() || textColumnValue.isEmpty() ? "true" : "false");
+//                    newRecord.add(typeColumnValue.contains("team") || record.get("player").isEmpty() ? "true" : "false");
+//                    newRecord.add(eventColumnValue.contains("timeout") ? "true" : "false");
+//                    newRecord.add(textColumnValue.contains("flagrant") ? "true" : "false");
+//                    newRecord.add(textColumnValue.contains("technical") || typeColumnValue.contains("technical") || eventColumnValue.contains("technical") ? "true" : "false");
+//                    newRecord.add(typeColumnValue.contains("3pt") || textColumnValue.toUpperCase().contains(" 3PT ") ? "true" : "false");
+//                    newRecord.add(eventColumnValue.contains("free throw") ? "true" : "false");
+//                    newRecord.add(eventColumnValue.contains("end of period") ? "true" : "false");
+//
+//                    csvPrinter.printRecord(newRecord);
+//                }
+//
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//    }
+
+    private void markupCSVs(List<File> inputCsvFiles, String outputFolderPath) {
+        // Create the output folder if it doesn't exist
+        File outputFolder = new File(outputFolderPath);
+        if (!outputFolder.exists()) {
+            outputFolder.mkdirs();
+        }
+
+        for (File inputFile : inputCsvFiles) {
+            // Determine output file path
+            File outputFile = new File(outputFolder, inputFile.getName());
+
+            try (BufferedReader reader = new BufferedReader(new FileReader(inputFile));
+                 FileWriter writer = new FileWriter(outputFile);
+                 CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT.builder()
+                         .setHeader(getCombinedHeader(inputFile).toArray(new String[0]))
+                         .build())) {
+
+                // List to hold processed CSV lines
+                List<String> processedLines = new ArrayList<>();
+                String line;
+
+                // Read and process each line one by one
+                while ((line = reader.readLine()) != null) {
+                    // Replace any occurrences of "Jones, Jr." in the raw CSV line
+                    line = line.replace("Jones, Jr.", "Jones Jr.")
+                            .replaceAll("Jones,\"\\s*Jr", "Jones Jr");
+
+                    // Add the processed line to the list
+                    processedLines.add(line);
+                }
+
+                // Combine the lines into a single block for parsing
+                StringBuilder csvData = new StringBuilder();
+                for (String processedLine : processedLines) {
+                    csvData.append(processedLine).append("\n");
+                }
+
+                // Now parse the entire modified CSV data in one go
+                try (Reader csvReader = new StringReader(csvData.toString())) {
+                    CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build();
+                    Iterable<CSVRecord> records = csvFormat.parse(csvReader);
+
+                    // Get the index of the "date" column
+                    List<String> headersList = new ArrayList<>(records.iterator().next().toMap().keySet());
+                    int dateIndex = headersList.indexOf("date");
+
+                    for (CSVRecord record : records) {
+                        List<String> newRecord = new ArrayList<>(record.toList());
+
+                        // Convert the date format and set it at the appropriate index
+                        String dateValue = record.get(dateIndex);
+                        newRecord.set(dateIndex, convertDateFormat(dateValue));
+
+                        // Existing code to add new columns
+                        String textColumnValue = record.get("description").toLowerCase();
+                        String typeColumnValue = record.get("type").toLowerCase();
+                        String eventColumnValue = record.get("event_type").toLowerCase();
+
+                        newRecord.add(eventColumnValue.contains("rebound") ? "true" : "false");
+                        newRecord.add(textColumnValue.contains("ast)") ? "true" : "false");
+                        newRecord.add(eventColumnValue.contains("foul") ? "true" : "false");
+                        newRecord.add(!record.get("result").isEmpty() || !record.get("shot_distance").isEmpty() || typeColumnValue.contains("offensive") ? "true" : "false");
+                        newRecord.add(typeColumnValue.contains("defensive") ? "true" : "false");
+                        newRecord.add(eventColumnValue.contains("turnover") ? "true" : "false");
+                        newRecord.add(eventColumnValue.contains("violation") ? "true" : "false");
+                        newRecord.add(textColumnValue.contains("coach") || eventColumnValue.contains("start of period") || typeColumnValue.contains("challenge") || eventColumnValue.isEmpty() || textColumnValue.isEmpty() ? "true" : "false");
+                        newRecord.add(typeColumnValue.contains("team") || record.get("player").isEmpty() ? "true" : "false");
+                        newRecord.add(eventColumnValue.contains("timeout") ? "true" : "false");
+                        newRecord.add(textColumnValue.contains("flagrant") ? "true" : "false");
+                        newRecord.add(textColumnValue.contains("technical") || typeColumnValue.contains("technical") || eventColumnValue.contains("technical") ? "true" : "false");
+                        newRecord.add(typeColumnValue.contains("3pt") || textColumnValue.toUpperCase().contains(" 3PT ") ? "true" : "false");
+                        newRecord.add(eventColumnValue.contains("free throw") ? "true" : "false");
+                        newRecord.add(eventColumnValue.contains("end of period") ? "true" : "false");
+
+                        csvPrinter.printRecord(newRecord);
+                    }
+                }
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+
+    private String convertDateFormat(String dateValue) {
+        SimpleDateFormat inputFormat = new SimpleDateFormat("M/d/yyyy");
+        SimpleDateFormat outputFormat = new SimpleDateFormat("yyyy-MM-dd");
+        try {
+            Date date = inputFormat.parse(dateValue);
+            return outputFormat.format(date);
+        } catch (ParseException e) {
+            return dateValue; // Return the original value if parsing fails
+        }
+    }
+
+    // Helper method to get combined header
+    private List<String> getCombinedHeader(File inputFile) {
+        try (Reader reader = new FileReader(inputFile)) {
+            CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build();
+            Iterable<CSVRecord> records = csvFormat.parse(reader);
+            List<String> originalHeader = new ArrayList<>(records.iterator().next().toMap().keySet());
+            List<String> newHeaders = List.of("rebound", "assists", "foul", "offensive", "defensive", "turnover", "violation", "ignore", "wasTeam", "timeout", "flagrant", "technical", "3pt", "free_throw", "end_period");
+            List<String> combinedHeader = new ArrayList<>(originalHeader);
+            combinedHeader.addAll(newHeaders);
+            return combinedHeader;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return Collections.emptyList();
+        }
+    }
+
+    private void handleMissingHeader(String inputCsvFile) {
+        try {
+            List<String> lines = Files.readAllLines(Paths.get(inputCsvFile));
+            if (!lines.isEmpty()) {
+                String[] headers = lines.get(0).split(",");
+                for (int i = 0; i < headers.length; i++) {
+                    if (!headers[i].matches(".*[a-zA-Z0-9].*")) {
+                        headers[i] = "UnNamedColumn";
+                    }
+                }
+                lines.set(0, String.join(",", headers));
+                try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(inputCsvFile))) {
+                    writer.write(lines.get(0));
+                    writer.newLine();
+                    for (int i = 1; i < lines.size(); i++) {
+                        writer.write(lines.get(i));
+                        writer.newLine();
+                    }
+                }
             }
         } catch (IOException e) {
-            System.out.println("failed to read file.");
             e.printStackTrace();
         }
-        return players;
     }
 
-    /**
-     * Attempts to find player object based on ID parameter
-     * @param ID Player ID to look for
-     * @return Player object with matching id; otherwise null
-     */
-    private Player findPlayer(int ID){
-        for (Player player : totalPlayers){
-            if (player.getPlayerID() == ID){
-                return player;
-            }
-        }
-        return null;
-    }
 
-    /**
-     * Gets all the player's ids under a specific prefix.
-     * @param record row to look at
-     * @param prefix prefix for looking at column
-     * @param count how many duplicate columns are there? ex: athlete_id_1, athlete_id_2
-     * @return List of all player objects created from searching the csv.
-     */
-    private  List<Player> extractPlayersFromMatchupData(CSVRecord record, String prefix, int count) {
-        List<Player> players = new ArrayList<>();
-        for (int i = 1; i <= count; i++) {
-            String idKey = prefix + i + "_id";
-            String nameKey = prefix.substring(0, 5) + "display_name";
-            if (rowHasValue(record, idKey) && rowHasValue(record, nameKey)) {
-                int playerId = parseInt(record.get(idKey));
-                String playerTeam = record.get(nameKey);
-                players.add(new Player(playerId, playerTeam));
-            }
-        }
-        return players;
-    }
-
-    /**
-     * Changes a String value to an integer value.
-     * @param value String to get integer from.
-     * @return value of String as integer; Otherwise returns 0;
-     */
     private int parseInt(String value) {
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
-            return 0; // or some default value or throw an exception
+            return 0;
         }
     }
 
@@ -103,157 +243,50 @@ public class CSVGatherer {
         return record.isMapped(key) && !record.get(key).equals("NA") && !record.get(key).isEmpty();
     }
 
-    /**
-     * Reads the data from the inputCsvFile, gets the original headers, appends the new headers, and then creates a new csv with these values added:
-     * true/false: rebound, assist, foul, offensive, defensive, turnover, violation, ignore, wasTeam, timeout, flagrant.
-     * plays ignored are: Challenges, End Game, End Period, Not Available, Ref reviews
-     * plays also considered turnovers: traveling
-     * @param inputCsvFile File to read
-     * @param outputCsvFile file to write too.
-     */
-    private void markupCSV(String inputCsvFile, String outputCsvFile){
-        try (
-                Reader reader = new FileReader(inputCsvFile);
-                FileWriter writer = new FileWriter(outputCsvFile)
-        ) {
-            // Read the input CSV file
-            CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build();
-            Iterable<CSVRecord> records = csvFormat.parse(reader);
+    private void convertMatchupDates(String matchupPath, String outputFilePath){
+        // Define the input and output date formats
+        SimpleDateFormat inputFormat = new SimpleDateFormat("MM/dd/yyyy");
+        SimpleDateFormat outputFormat = new SimpleDateFormat("yyyy-MM-dd");
 
-            // Get the original header
-            List<String> originalHeader = new ArrayList<>(records.iterator().next().toMap().keySet());
+        try (BufferedReader br = new BufferedReader(new FileReader(matchupPath));
+             BufferedWriter bw = new BufferedWriter(new FileWriter(outputFilePath))) {
 
-            // Define the new headers to be added
-            List<String> newHeaders = List.of("rebound", "assist", "foul", "offensive", "defensive", "turnover", "violation", "ignore", "wasTeam", "timeout", "flagrant");
+            String line;
+            // Read the header first
+            String header = br.readLine();
+            bw.write(header);  // Copy the header to the output file
+            bw.newLine();
 
-            // Combine the original header with the new headers
-            List<String> combinedHeader = new ArrayList<>(originalHeader);
-            combinedHeader.addAll(newHeaders);
+            // Read each line
+            while ((line = br.readLine()) != null) {
+                String[] values = line.split(",");
 
-            // Write the header to the output CSV file
-            CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT.builder().setHeader(combinedHeader.toArray(new String[0])).build());
+                // Assuming the date is in the first column (adjust index as needed)
+                String dateStr = values[2];
 
-            // Reset the reader to re-read the file including the first data row
-            reader.close();
-            try (Reader reader2 = new FileReader(inputCsvFile)) {
-                records = csvFormat.parse(reader2);
+                try {
+                    // Parse the date in MM/dd/yyyy format
+                    Date date = inputFormat.parse(dateStr);
 
-                // Iterate through records and write each record with the new columns
-                for (CSVRecord record : records) {
-                    List<String> newRecord = new ArrayList<>();
-                    record.forEach(newRecord::add);
+                    // Format the date in yyyy-MM-dd format
+                    String formattedDate = outputFormat.format(date);
 
-                    // Extract the relevant data from the 'text' column (assuming it is named "text")
-                    String textColumnValue = record.get("text").toLowerCase();
-                    String typeColumnValue = record.get("type_text").toLowerCase(
-                    );
+                    // Replace the original date with the formatted one
+                    values[2] = formattedDate;
 
-                    // Add new columns with data based on the content of the 'text' column
-                    newRecord.add(textColumnValue.contains("rebound") ? "true" : "false");
-                    newRecord.add(textColumnValue.contains("assist") ? "true" : "false");
-                    newRecord.add(textColumnValue.contains("foul") ? "true" : "false");
-                    newRecord.add(record.get("shooting_play").equals("TRUE") || textColumnValue.contains("offensive") ? "true" : "false");
-                    newRecord.add(textColumnValue.contains("defensive") ? "true" : "false");
-                    newRecord.add(typeColumnValue.contains("turnover")
-                            || typeColumnValue.contains("traveling")? "true" : "false");
-                    newRecord.add(textColumnValue.contains("violation") ? "true" : "false");
-                    if(textColumnValue.contains("coach's challenge") || typeColumnValue.contains("end game") || typeColumnValue.contains("end period")
-                            || textColumnValue.contains("ref") || typeColumnValue.contains("not available") || typeColumnValue.contains("challenge")) {
-                        newRecord.add("true");
-                    }else{
-                        newRecord.add("false");
-                    }
-                    newRecord.add(textColumnValue.contains("team") ? "true" : "false");
-                    newRecord.add(typeColumnValue.contains("timeout") ? "true" : "false");
-                    newRecord.add(textColumnValue.contains("flagrant") ? "true" : "false");
-                    csvPrinter.printRecord(newRecord);
+                    // Write the modified line to the output file
+                    bw.write(String.join(",", values));
+                    bw.newLine();
+
+                } catch (ParseException e) {
+                    e.printStackTrace();
                 }
-
             }
-
-            csvPrinter.close();
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-
-    /**
-     * Reads the data from the inputCsvFile, gets the original headers, appends the new headers, and then creates a new csv with the possession column appended.
-     * Possession is considered none if play is: ignored, foul, violation, Timeout, Jumpball, Free Throw, Substitution.
-     * Possession goes to athlete one if play is: team play, offensive or defensive.
-     * @param inputCsvFile File to read.
-     * @param outputCsvFile File to write too.
-     */
-    private void establishPossession(String inputCsvFile, String outputCsvFile){
-        try (
-                Reader reader = new FileReader(inputCsvFile);
-                FileWriter writer = new FileWriter(outputCsvFile)
-        ) {
-            // Read the input CSV file
-            CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build();
-            Iterable<CSVRecord> records = csvFormat.parse(reader);
-
-            // Get the original header
-            List<String> originalHeader = new ArrayList<>(records.iterator().next().toMap().keySet());
-
-            // Define the new headers to be added
-            List<String> newHeaders = List.of( "possession");
-
-            // Combine the original header with the new headers
-            List<String> combinedHeader = new ArrayList<>(originalHeader);
-            combinedHeader.addAll(newHeaders);
-
-            // Write the header to the output CSV file
-            CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT.builder().setHeader(combinedHeader.toArray(new String[0])).build());
-
-            // Reset the reader to re-read the file including the first data row
-            reader.close();
-            try (Reader reader2 = new FileReader(inputCsvFile)) {
-                records = csvFormat.parse(reader2);
-
-                // Iterate through records and write each record with the new columns
-                for (CSVRecord record : records) {
-                    List<String> newRecord = new ArrayList<>();
-                    record.forEach(newRecord::add);
-
-                    // Extract the relevant data from the 'text' column (assuming it is named "text")
-                    String textColumnValue = record.get("text").toLowerCase();
-                    String typeColumnValue = record.get("type_text").toLowerCase();
-
-                    // Add new columns with data based on the content of the 'text' column
-                    if (record.get("ignore").equals("true") || record.get("foul").equals("true") ||
-                            record.get("turnover").equals("true") || typeColumnValue.contains("substitution") ||
-                            typeColumnValue.contains("timeout") || typeColumnValue.contains("jumpball") || record.get("violation").equals("true") || parseInt(record.get("free_throw")) > 0){
-                        newRecord.add("none");
-                    }else if (record.get("wasTeam").equals("true")){
-                        for (String val : textColumnValue.split(" ")){
-                            if (record.get("home_display_name").contains(val)){
-                                newRecord.add(record.get("home_display_name"));
-                            }else{
-                                newRecord.add(record.get("away_display_name"));
-                            }
-                            break;
-                        }
-                    }else if (record.get("offensive").equals("true") || record.get("defensive").equals("true")) {
-                        Player player = findPlayer(parseInt(record.get("athlete_id_1")));
-                        if (player == null) {
-                            newRecord.add("none");
-                        } else {
-                            String team = player.getTeam();
-                            newRecord.add(team);
-                        }
-                    }
-                    csvPrinter.printRecord(newRecord);
-                }
-
-            }
-
-            csvPrinter.close();
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
-}
+
 
